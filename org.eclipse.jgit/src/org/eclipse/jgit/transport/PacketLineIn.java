@@ -56,7 +56,7 @@ import org.eclipse.jgit.lib.MutableObjectId;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
 
-class PacketLineIn {
+public class PacketLineIn {
 	static final String END = new String("") /* must not string pool */;
 
 	static enum AckNackResult {
@@ -76,7 +76,7 @@ class PacketLineIn {
 
 	private final byte[] lineBuffer;
 
-	PacketLineIn(final InputStream i) {
+	public PacketLineIn(final InputStream i) {
 		in = i;
 		lineBuffer = new byte[SideBandOutputStream.SMALL_BUF];
 	}
@@ -119,7 +119,7 @@ class PacketLineIn {
 		return RawParseUtils.decode(Constants.CHARSET, raw, 0, len);
 	}
 
-	String readStringRaw() throws IOException {
+	public String readStringRaw() throws IOException {
 		int len = readLength();
 		if (len == 0)
 			return END;
