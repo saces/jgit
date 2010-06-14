@@ -175,6 +175,13 @@ public class GitServlet extends MetaServlet {
 
 	@Override
 	public void init(final ServletConfig config) throws ServletException {
+		// TODO/FIXME 
+		// this should be fixed in servlet container
+		if (initialized) {
+			System.out.println("GitServlet initilized twice, ignoring");
+			return;
+		}
+		// END
 		super.init(config);
 
 		if (resolver == null) {
