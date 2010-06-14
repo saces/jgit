@@ -70,7 +70,8 @@ class InfoRefsServlet extends HttpServlet {
 		// Assume a dumb client and send back the dumb client
 		// version of the info/refs file.
 		rsp.setContentType(HttpSupport.TEXT_PLAIN);
-		rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
+		// backport it from servlet 2.4?
+		//rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
 
 		final Repository db = getRepository(req);
 		final RevWalk walk = new RevWalk(db);

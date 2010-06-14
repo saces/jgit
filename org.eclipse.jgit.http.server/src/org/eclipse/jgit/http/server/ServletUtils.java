@@ -142,7 +142,8 @@ public final class ServletUtils {
 			throws IOException {
 		final byte[] raw = content.getBytes(Constants.CHARACTER_ENCODING);
 		rsp.setContentType(TEXT_PLAIN);
-		rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
+		// backport it from servlet 2.4?
+		//rsp.setCharacterEncoding(Constants.CHARACTER_ENCODING);
 		send(raw, req, rsp);
 	}
 
