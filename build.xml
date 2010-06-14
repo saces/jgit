@@ -1,0 +1,110 @@
+<?xml version="1.0"?>
+<!-- ant build file for jgit -->
+
+<project name="jgit" default="dist" basedir=".">
+	<property name="source-version" value="1.5"/>
+	<property name="target-version" value="1.5"/>
+	<property name="build" location="build/"/>
+	<property name="dist" location="dist/"/>
+	<property name="src.jgit.jgit" location="org.eclipse.jgit/src/"/>
+	<property name="src.jgit.http.server" location="org.eclipse.jgit.http.server/src/"/>
+
+	<target name="mkdir">
+		<mkdir dir="${build}"/>
+		<mkdir dir="${dist}"/>
+	</target>
+
+	<!-- ================================================== -->
+	<target name="compile" depends="mkdir" >
+
+		<javac srcdir="${src.jgit.jgit}" destdir="${build}" debug="on" optimize="on" source="${source-version}" target="${target-version}">
+			<classpath>
+				<pathelement location="${freenet-ext.location}"/>
+				<pathelement location="${freenet-cvs-snapshot.location}"/>
+				<pathelement location="lib/jgit/org.eclipse.jgit/src"/>
+			</classpath>
+			<include name="**/*.java"/>
+			<exclude name="**/*Test.java"/>
+		</javac>
+
+		<javac srcdir="${src.jgit.http.server}" destdir="${build}" debug="on" optimize="on" source="${source-version}" target="${target-version}">
+			<classpath>
+				<pathelement location="${freenet-ext.location}"/>
+				<pathelement location="${freenet-cvs-snapshot.location}"/>
+				<pathelement location="lib/jgit/org.eclipse.jgit/src"/>
+			</classpath>
+			<include name="**/*.java"/>
+			<exclude name="**/*Test.java"/>
+		</javac>
+
+	</target>
+
+	<!-- ================================================== -->
+
+	<target name="unit-build" depends="compile" if="junit.present" unless="skip_tests">
+		<javac srcdir="src/" destdir="${build-test}" debug="on" optimize="on" source="1.5">
+			<classpath>
+				<pathelement path="${build}"/>
+				<pathelement location="${freenet-ext.location}"/>
+				<pathelement location="${freenet-cvs-snapshot.location}"/>
+				<pathelement location="${junit.location}"/>
+			</classpath>
+			<compilerarg value="-Xlint"/>
+			<include name="**/*Test.java"/>
+		</javac>
+	</target>
+
+	<target name="junit" depends="unit-build" if="junit.present" unless="skip_tests">
+		<junit printsummary="yes" fork="yes" haltonfailure="yes">
+			<classpath>
+				<pathelement path="${build}"/>
+				<pathelement path="${build-test}"/>
+				<pathelement location="${freenet-ext.location}"/>
+				<pathelement location="${freenet-cvs-snapshot.location}"/>
+				<pathelement location="${junit.location}"/>
+			</classpath>
+
+			<formatter type="plain" usefile="false"/>
+
+			<batchtest fork="yes">
+				<fileset dir="${build-test}">
+					<include name="**/*Test.class"/>
+				</fileset>
+			</batchtest>
+			<sysproperty key="benchmark" value="${benchmark}" />
+			<sysproperty key="extensiveTesting" value="${extensiveTesting}" />
+		</junit>
+	</target>
+
+	<!-- ================================================== -->
+	<target name="dist" depends="compile"
+		description="generate the distribution" >
+		<jar jarfile="${dist}/jgit.jar" duplicate="fail">
+			<manifest>
+				<attribute name="Bundle-ManifestVersion" value="1" />
+				<attribute name="Bundle-Name" value="jGit" />
+				<attribute name="Bundle-SymbolicName" value="org.foo.example.Example" />
+				<attribute name="Bundle-Version" value="0.0.1" />
+				<attribute name="Export-Package" value="org.eclipse.jgit, org.eclipse.jgit.api, org.eclipse.jgit.diff,
+				org.eclipse.jgit.dircache, org.eclipse.jgit.errors, org.eclipse.jgit.fnmatch, org.eclipse.jgit.lib,
+				org.eclipse.jgit.merge, org.eclipse.jgit.nls, org.eclipse.jgit.patch, org.eclipse.jgit.revplot,
+				org.eclipse.jgit.revwalk, org.eclipse.jgit.revwalk.filter, org.eclipse.jgit.transport,
+				org.eclipse.jgit.treewalk, org.eclipse.jgit.treewalk.filter, org.eclipse.jgit.util, org.eclipse.jgit.util.io,
+				org.eclipse.jgit.http.server, org.eclipse.jgit.http.server.glue, org.eclipse.jgit.http.server.resolver" />
+			</manifest>
+			<fileset dir="${build}/"/>
+			<fileset dir="org.eclipse.jgit.http.server/resources/">
+				<include name="**/*.properties"/>
+			</fileset>
+			<fileset dir="org.eclipse.jgit/resources/">
+				<include name="**/*.properties"/>
+			</fileset>
+		</jar>
+	</target>
+
+	<!-- ================================================== -->
+	<target name="clean" description="Delete class files and docs dir.">
+		<delete dir="${build}"/>
+		<delete dir="${dist}"/>
+	</target>
+</project>
