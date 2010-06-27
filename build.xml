@@ -9,6 +9,8 @@
 	<property name="src.jgit.jgit" location="org.eclipse.jgit/src/"/>
 	<property name="src.jgit.http.server" location="org.eclipse.jgit.http.server/src/"/>
 
+	<property name="servletapi.jar.location" location="../concierge/bundles/http/dist/concierge-http.jar"/>
+
 	<target name="mkdir">
 		<mkdir dir="${build}"/>
 		<mkdir dir="${dist}"/>
@@ -18,20 +20,13 @@
 	<target name="compile" depends="mkdir" >
 
 		<javac srcdir="${src.jgit.jgit}" destdir="${build}" debug="on" optimize="on" source="${source-version}" target="${target-version}">
-			<classpath>
-				<pathelement location="${freenet-ext.location}"/>
-				<pathelement location="${freenet-cvs-snapshot.location}"/>
-				<pathelement location="lib/jgit/org.eclipse.jgit/src"/>
-			</classpath>
 			<include name="**/*.java"/>
 			<exclude name="**/*Test.java"/>
 		</javac>
 
 		<javac srcdir="${src.jgit.http.server}" destdir="${build}" debug="on" optimize="on" source="${source-version}" target="${target-version}">
 			<classpath>
-				<pathelement location="${freenet-ext.location}"/>
-				<pathelement location="${freenet-cvs-snapshot.location}"/>
-				<pathelement location="lib/jgit/org.eclipse.jgit/src"/>
+				<pathelement location="${servletapi.jar.location}"/>
 			</classpath>
 			<include name="**/*.java"/>
 			<exclude name="**/*Test.java"/>
