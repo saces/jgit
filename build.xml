@@ -86,6 +86,7 @@
 				org.eclipse.jgit.revwalk, org.eclipse.jgit.revwalk.filter, org.eclipse.jgit.transport,
 				org.eclipse.jgit.treewalk, org.eclipse.jgit.treewalk.filter, org.eclipse.jgit.util, org.eclipse.jgit.util.io,
 				org.eclipse.jgit.http.server, org.eclipse.jgit.http.server.glue, org.eclipse.jgit.http.server.resolver" />
+				<attribute name="Import-Package" value="javax.servlet, javax.servlet.http"/>
 			</manifest>
 			<fileset dir="${build}/"/>
 			<fileset dir="org.eclipse.jgit.http.server/resources/">
