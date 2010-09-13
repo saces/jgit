@@ -90,6 +90,11 @@ public class PathFilter extends TreeFilter {
 		pathRaw = Constants.encode(pathStr);
 	}
 
+	/** @return the path this filter matches. */
+	public String getPath() {
+		return pathStr;
+	}
+
 	@Override
 	public boolean include(final TreeWalk walker) {
 		return walker.isPathPrefix(pathRaw, pathRaw.length) == 0;
@@ -104,7 +109,7 @@ public class PathFilter extends TreeFilter {
 	}
 
 	@Override
-	public TreeFilter clone() {
+	public PathFilter clone() {
 		return this;
 	}
 

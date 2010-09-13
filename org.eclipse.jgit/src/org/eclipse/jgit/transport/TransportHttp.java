@@ -85,10 +85,10 @@ import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
-import org.eclipse.jgit.lib.RefDirectory;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.SymbolicRef;
 import org.eclipse.jgit.lib.Config.SectionParser;
+import org.eclipse.jgit.storage.file.RefDirectory;
 import org.eclipse.jgit.util.HttpSupport;
 import org.eclipse.jgit.util.IO;
 import org.eclipse.jgit.util.RawParseUtils;
@@ -379,6 +379,8 @@ public class TransportHttp extends HttpTransport implements WalkTransport,
 		conn.setRequestProperty(HDR_ACCEPT_ENCODING, ENCODING_GZIP);
 		conn.setRequestProperty(HDR_PRAGMA, "no-cache");//$NON-NLS-1$
 		conn.setRequestProperty(HDR_USER_AGENT, userAgent);
+		conn.setConnectTimeout(getTimeout() * 1000);
+		conn.setReadTimeout(getTimeout() * 1000);
 		return conn;
 	}
 

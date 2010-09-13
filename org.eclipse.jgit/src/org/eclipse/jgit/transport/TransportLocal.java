@@ -61,6 +61,7 @@ import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.util.FS;
 import org.eclipse.jgit.util.io.MessageWriter;
 import org.eclipse.jgit.util.io.StreamCopyThread;
@@ -91,13 +92,13 @@ import org.eclipse.jgit.util.io.StreamCopyThread;
 class TransportLocal extends Transport implements PackTransport {
 	private static final String PWD = ".";
 
-	static boolean canHandle(final URIish uri) {
+	static boolean canHandle(final URIish uri, FS fs) {
 		if (uri.getHost() != null || uri.getPort() > 0 || uri.getUser() != null
 				|| uri.getPass() != null || uri.getPath() == null)
 			return false;
 
 		if ("file".equals(uri.getScheme()) || uri.getScheme() == null)
-			return FS.resolve(new File(PWD), uri.getPath()).isDirectory();
+			return fs.resolve(new File(PWD), uri.getPath()).isDirectory();
 		return false;
 	}
 
@@ -106,7 +107,7 @@ class TransportLocal extends Transport implements PackTransport {
 	TransportLocal(final Repository local, final URIish uri) {
 		super(local, uri);
 
-		File d = FS.resolve(new File(PWD), uri.getPath()).getAbsoluteFile();
+		File d = local.getFS().resolve(new File(PWD), uri.getPath()).getAbsoluteFile();
 		if (new File(d, Constants.DOT_GIT).isDirectory())
 			d = new File(d, Constants.DOT_GIT);
 		remoteGitDir = d;
@@ -174,7 +175,7 @@ class TransportLocal extends Transport implements PackTransport {
 
 			final Repository dst;
 			try {
-				dst = new Repository(remoteGitDir);
+				dst = new FileRepository(remoteGitDir);
 			} catch (IOException err) {
 				throw new TransportException(uri, JGitText.get().notAGitDirectory);
 			}
@@ -314,7 +315,7 @@ class TransportLocal extends Transport implements PackTransport {
 
 			final Repository dst;
 			try {
-				dst = new Repository(remoteGitDir);
+				dst = new FileRepository(remoteGitDir);
 			} catch (IOException err) {
 				throw new TransportException(uri, JGitText.get().notAGitDirectory);
 			}

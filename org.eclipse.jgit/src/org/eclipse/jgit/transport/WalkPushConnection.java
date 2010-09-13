@@ -61,12 +61,12 @@ import org.eclipse.jgit.lib.AnyObjectId;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdRef;
-import org.eclipse.jgit.lib.PackWriter;
 import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefWriter;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.Ref.Storage;
+import org.eclipse.jgit.storage.pack.PackWriter;
 import org.eclipse.jgit.transport.RemoteRefUpdate.Status;
 
 /**
@@ -103,6 +103,9 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 	/** Database connection to the remote repository. */
 	private final WalkRemoteObjectDatabase dest;
 
+	/** The configured transport we were constructed by. */
+	private final Transport transport;
+
 	/**
 	 * Packs already known to reside in the remote repository.
 	 * <p>
@@ -123,9 +126,9 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 
 	WalkPushConnection(final WalkTransport walkTransport,
 			final WalkRemoteObjectDatabase w) {
-		Transport t = (Transport)walkTransport;
-		local = t.local;
-		uri = t.getURI();
+		transport = (Transport) walkTransport;
+		local = transport.local;
+		uri = transport.getURI();
 		dest = w;
 	}
 
@@ -209,8 +212,9 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 		String pathPack = null;
 		String pathIdx = null;
 
+		final PackWriter writer = new PackWriter(transport.getPackConfig(),
+				local.newObjectReader());
 		try {
-			final PackWriter pw = new PackWriter(local, monitor);
 			final List<ObjectId> need = new ArrayList<ObjectId>();
 			final List<ObjectId> have = new ArrayList<ObjectId>();
 			for (final RemoteRefUpdate r : updates)
@@ -220,20 +224,20 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 				if (r.getPeeledObjectId() != null)
 					have.add(r.getPeeledObjectId());
 			}
-			pw.preparePack(need, have);
+			writer.preparePack(monitor, need, have);
 
 			// We don't have to continue further if the pack will
 			// be an empty pack, as the remote has all objects it
 			// needs to complete this change.
 			//
-			if (pw.getObjectsNumber() == 0)
+			if (writer.getObjectsNumber() == 0)
 				return;
 
 			packNames = new LinkedHashMap<String, String>();
 			for (final String n : dest.getPackNames())
 				packNames.put(n, n);
 
-			final String base = "pack-" + pw.computeName().name();
+			final String base = "pack-" + writer.computeName().name();
 			final String packName = base + ".pack";
 			pathPack = "pack/" + packName;
 			pathIdx = "pack/" + base + ".idx";
@@ -254,7 +258,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			OutputStream os = dest.writeFile(pathPack, monitor, wt + "..pack");
 			try {
 				os = new BufferedOutputStream(os);
-				pw.writePack(os);
+				writer.writePack(monitor, monitor, os);
 			} finally {
 				os.close();
 			}
@@ -262,7 +266,7 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			os = dest.writeFile(pathIdx, monitor, wt + "..idx");
 			try {
 				os = new BufferedOutputStream(os);
-				pw.writeIndex(os);
+				writer.writeIndex(os);
 			} finally {
 				os.close();
 			}
@@ -281,6 +285,8 @@ class WalkPushConnection extends BaseConnection implements PushConnection {
 			safeDelete(pathPack);
 
 			throw new TransportException(uri, JGitText.get().cannotStoreObjects, err);
+		} finally {
+			writer.release();
 		}
 	}
 

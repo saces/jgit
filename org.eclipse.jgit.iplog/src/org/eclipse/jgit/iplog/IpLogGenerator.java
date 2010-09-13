@@ -77,16 +77,15 @@ import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.EditList;
 import org.eclipse.jgit.diff.MyersDiff;
 import org.eclipse.jgit.diff.RawText;
+import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.errors.ConfigInvalidException;
-import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.iplog.Committer.ActiveRange;
 import org.eclipse.jgit.lib.BlobBasedConfig;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.MutableObjectId;
-import org.eclipse.jgit.lib.ObjectLoader;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.lib.WindowCursor;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
@@ -144,7 +143,7 @@ public class IpLogGenerator {
 
 	private NameConflictTreeWalk tw;
 
-	private final WindowCursor curs = new WindowCursor();
+	private ObjectReader curs;
 
 	private final MutableObjectId idbuf = new MutableObjectId();
 
@@ -184,8 +183,9 @@ public class IpLogGenerator {
 			throws IOException, ConfigInvalidException {
 		try {
 			db = repo;
-			rw = new RevWalk(db);
-			tw = new NameConflictTreeWalk(db);
+			curs = db.newObjectReader();
+			rw = new RevWalk(curs);
+			tw = new NameConflictTreeWalk(curs);
 
 			RevCommit c = rw.parseCommit(startCommit);
 
@@ -194,7 +194,7 @@ public class IpLogGenerator {
 			scanProjectCommits(meta.getProjects().get(0), c);
 			commits.add(c);
 		} finally {
-			WindowCursor.release(curs);
+			curs.release();
 			db = null;
 			rw = null;
 			tw = null;
@@ -236,36 +236,40 @@ public class IpLogGenerator {
 		SimpleDateFormat dt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 		File list = new File(repo.getDirectory(), "gerrit_committers");
 		BufferedReader br = new BufferedReader(new FileReader(list));
-		String line;
+		try {
+			String line;
 
-		while ((line = br.readLine()) != null) {
-			String[] field = line.trim().split(" *\\| *");
-			String user = field[1];
-			String name = field[2];
-			String email = field[3];
-			Date begin = parseDate(dt, field[4]);
-			Date end = parseDate(dt, field[5]);
+			while ((line = br.readLine()) != null) {
+				String[] field = line.trim().split(" *\\| *");
+				String user = field[1];
+				String name = field[2];
+				String email = field[3];
+				Date begin = parseDate(dt, field[4]);
+				Date end = parseDate(dt, field[5]);
 
-			if (user.startsWith("username:"))
-				user = user.substring("username:".length());
+				if (user.startsWith("username:"))
+					user = user.substring("username:".length());
 
-			Committer who = committersById.get(user);
-			if (who == null) {
-				who = new Committer(user);
-				int sp = name.indexOf(' ');
-				if (0 < sp) {
-					who.setFirstName(name.substring(0, sp).trim());
-					who.setLastName(name.substring(sp + 1).trim());
-				} else {
-					who.setFirstName(name);
-					who.setLastName(null);
+				Committer who = committersById.get(user);
+				if (who == null) {
+					who = new Committer(user);
+					int sp = name.indexOf(' ');
+					if (0 < sp) {
+						who.setFirstName(name.substring(0, sp).trim());
+						who.setLastName(name.substring(sp + 1).trim());
+					} else {
+						who.setFirstName(name);
+						who.setLastName(null);
+					}
+					committersById.put(who.getID(), who);
 				}
-				committersById.put(who.getID(), who);
-			}
 
-			who.addEmailAddress(email);
-			who.addActiveRange(new ActiveRange(begin, end));
-			committersByEmail.put(email, who);
+				who.addEmailAddress(email);
+				who.addActiveRange(new ActiveRange(begin, end));
+				committersByEmail.put(email, who);
+			}
+		} finally {
+			br.close();
 		}
 	}
 
@@ -380,7 +384,8 @@ public class IpLogGenerator {
 					else
 						oldImage = new byte[0];
 
-					EditList edits = new MyersDiff(new RawText(oldImage),
+					EditList edits = new MyersDiff<RawText>(
+							RawTextComparator.DEFAULT, new RawText(oldImage),
 							new RawText(openBlob(1))).getEdits();
 					for (Edit e : edits)
 						addedLines += e.getEndB() - e.getBeginB();
@@ -413,10 +418,7 @@ public class IpLogGenerator {
 
 	private byte[] openBlob(int side) throws IOException {
 		tw.getObjectId(idbuf, side);
-		ObjectLoader ldr = db.openObject(curs, idbuf);
-		if (ldr == null)
-			throw new MissingObjectException(idbuf.copy(), Constants.OBJ_BLOB);
-		return ldr.getCachedBytes();
+		return curs.open(idbuf, Constants.OBJ_BLOB).getCachedBytes();
 	}
 
 	/**

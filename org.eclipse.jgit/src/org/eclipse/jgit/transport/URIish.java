@@ -45,6 +45,7 @@
 
 package org.eclipse.jgit.transport;
 
+import java.io.Serializable;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.regex.Matcher;
@@ -59,9 +60,16 @@ import org.eclipse.jgit.lib.Constants;
  * RFC 2396 URI's is that no URI encoding/decoding ever takes place. A space or
  * any special character is written as-is.
  */
-public class URIish {
+public class URIish implements Serializable {
+	private static final long serialVersionUID = 1L;
+
 	private static final Pattern FULL_URI = Pattern
-			.compile("^(?:([a-z][a-z0-9+-]+)://(?:([^/]+?)(?::([^/]+?))?@)?(?:([^/]+?))?(?::(\\d+))?)?((?:[A-Za-z]:)?/.+)$");
+			.compile("^(?:([a-z][a-z0-9+-]+)://" // optional http://
+					+ "(?:([^/]+?)(?::([^/]+?))?@)?" // optional user:password@
+					+ "(?:([^/]+?))?(?::(\\d+))?)?" // optional example.com:1337
+					+ "((?:[A-Za-z]:)?" // optional drive-letter:
+					+ "(?:\\.\\.)?" // optionally a relative path
+					+"/.+)$"); // /anything
 
 	private static final Pattern SCP_URI = Pattern
 			.compile("^(?:([^@]+?)@)?([^:]+?):(.+)$");
@@ -100,6 +108,9 @@ public class URIish {
 			&& path.charAt(2) == ':'
 			&& (path.charAt(1) >= 'A' && path.charAt(1) <= 'Z'
 			 || path.charAt(1) >= 'a' && path.charAt(1) <= 'z'))
+				path = path.substring(1);
+			else if (scheme != null && path.length() >= 2
+					&& path.charAt(0) == '/' && path.charAt(1) == '~')
 				path = path.substring(1);
 		} else {
 			matcher = SCP_URI.matcher(s);

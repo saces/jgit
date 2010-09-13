@@ -51,25 +51,28 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.kohsuke.args4j.Argument;
-import org.kohsuke.args4j.Option;
+import org.eclipse.jgit.errors.IncorrectObjectTypeException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.NotSupportedException;
 import org.eclipse.jgit.errors.TransportException;
-import org.eclipse.jgit.lib.Commit;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.GitIndex;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefComparator;
 import org.eclipse.jgit.lib.RefUpdate;
-import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TextProgressMonitor;
 import org.eclipse.jgit.lib.Tree;
 import org.eclipse.jgit.lib.WorkDirCheckout;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.FileRepository;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.RefSpec;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.URIish;
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.Option;
 
 @Command(common = true, usage = "usage_cloneRepositoryIntoNewDir")
 class Clone extends AbstractFetchCommand {
@@ -81,6 +84,8 @@ class Clone extends AbstractFetchCommand {
 
 	@Argument(index = 1, metaVar = "metaVar_directory")
 	private String localName;
+
+	private FileRepository dst;
 
 	@Override
 	protected final boolean requiresRepository() {
@@ -103,10 +108,11 @@ class Clone extends AbstractFetchCommand {
 		if (gitdir == null)
 			gitdir = new File(localName, Constants.DOT_GIT);
 
-		db = new Repository(gitdir);
-		db.create();
-		db.getConfig().setBoolean("core", null, "bare", false);
-		db.getConfig().save();
+		dst = new FileRepository(gitdir);
+		dst.create();
+		dst.getConfig().setBoolean("core", null, "bare", false);
+		dst.getConfig().save();
+		db = dst;
 
 		out.format(CLIText.get().initializedEmptyGitRepositoryIn, gitdir.getAbsolutePath());
 		out.println();
@@ -120,13 +126,13 @@ class Clone extends AbstractFetchCommand {
 
 	private void saveRemote(final URIish uri) throws URISyntaxException,
 			IOException {
-		final RemoteConfig rc = new RemoteConfig(db.getConfig(), remoteName);
+		final RemoteConfig rc = new RemoteConfig(dst.getConfig(), remoteName);
 		rc.addURI(uri);
 		rc.addFetchRefSpec(new RefSpec().setForceUpdate(true)
 				.setSourceDestination(Constants.R_HEADS + "*",
 						Constants.R_REMOTES + remoteName + "/*"));
-		rc.update(db.getConfig());
-		db.getConfig().save();
+		rc.update(dst.getConfig());
+		dst.getConfig().save();
 	}
 
 	private FetchResult runFetch() throws NotSupportedException,
@@ -171,17 +177,30 @@ class Clone extends AbstractFetchCommand {
 			u.link(branch.getName());
 		}
 
-		final Commit commit = db.mapCommit(branch.getObjectId());
+		final RevCommit commit = parseCommit(branch);
 		final RefUpdate u = db.updateRef(Constants.HEAD);
-		u.setNewObjectId(commit.getCommitId());
+		u.setNewObjectId(commit);
 		u.forceUpdate();
 
 		final GitIndex index = new GitIndex(db);
-		final Tree tree = commit.getTree();
+		final Tree tree = db.mapTree(commit.getTree());
 		final WorkDirCheckout co;
 
-		co = new WorkDirCheckout(db, db.getWorkDir(), index, tree);
+		co = new WorkDirCheckout(db, db.getWorkTree(), index, tree);
 		co.checkout();
 		index.write();
+	}
+
+	private RevCommit parseCommit(final Ref branch)
+			throws MissingObjectException, IncorrectObjectTypeException,
+			IOException {
+		final RevWalk rw = new RevWalk(db);
+		final RevCommit commit;
+		try {
+			commit = rw.parseCommit(branch.getObjectId());
+		} finally {
+			rw.release();
+		}
+		return commit;
 	}
 }

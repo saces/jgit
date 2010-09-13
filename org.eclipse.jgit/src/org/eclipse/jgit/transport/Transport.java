@@ -66,6 +66,8 @@ import org.eclipse.jgit.lib.ProgressMonitor;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.lib.TransferConfig;
+import org.eclipse.jgit.storage.pack.PackConfig;
+import org.eclipse.jgit.util.FS;
 
 /**
  * Connects two Git repositories together and copies objects between them.
@@ -319,6 +321,34 @@ public abstract class Transport {
 	}
 
 	/**
+	 * Determines whether the transport can handle the given URIish.
+	 *
+	 * @param remote
+	 *            location of the remote repository.
+	 * @param fs
+	 *            type of filesystem the local repository is stored on.
+	 * @return true if the protocol is supported.
+	 */
+	public static boolean canHandleProtocol(final URIish remote, final FS fs) {
+		if (TransportHttp.canHandle(remote))
+			return true;
+
+		else if (TransportGitAnon.canHandle(remote))
+			return true;
+
+		else if (TransportAmazonS3.canHandle(remote))
+			return true;
+
+		else if (TransportBundleFile.canHandle(remote, fs))
+			return true;
+
+		else if (TransportLocal.canHandle(remote, fs))
+			return true;
+
+		return false;
+	}
+
+	/**
 	 * Open a new transport instance to connect two repositories.
 	 *
 	 * @param local
@@ -340,10 +370,10 @@ public abstract class Transport {
 		else if (TransportAmazonS3.canHandle(remote))
 			return new TransportAmazonS3(local, remote);
 
-		else if (TransportBundleFile.canHandle(remote))
+		else if (TransportBundleFile.canHandle(remote, local.getFS()))
 			return new TransportBundleFile(local, remote);
 
-		else if (TransportLocal.canHandle(remote))
+		else if (TransportLocal.canHandle(remote, local.getFS()))
 			return new TransportLocal(local, remote);
 
 		throw new NotSupportedException(MessageFormat.format(JGitText.get().URINotSupported, remote));
@@ -513,6 +543,9 @@ public abstract class Transport {
 	/** Timeout in seconds to wait before aborting an IO read or write. */
 	private int timeout;
 
+	/** Pack configuration used by this transport to make pack file. */
+	private PackConfig packConfig;
+
 	/**
 	 * Create a new transport instance.
 	 *
@@ -525,7 +558,7 @@ public abstract class Transport {
 	 *            URI passed to {@link #open(Repository, URIish)}.
 	 */
 	protected Transport(final Repository local, final URIish uri) {
-		final TransferConfig tc = local.getConfig().getTransfer();
+		final TransferConfig tc = local.getConfig().get(TransferConfig.KEY);
 		this.local = local;
 		this.uri = uri;
 		this.checkFetchedObjects = tc.isFsckObjects();
@@ -748,6 +781,32 @@ public abstract class Transport {
 	 */
 	public void setTimeout(final int seconds) {
 		timeout = seconds;
+	}
+
+	/**
+	 * Get the configuration used by the pack generator to make packs.
+	 *
+	 * If {@link #setPackConfig(PackConfig)} was previously given null a new
+	 * PackConfig is created on demand by this method using the source
+	 * repository's settings.
+	 *
+	 * @return the pack configuration. Never null.
+	 */
+	public PackConfig getPackConfig() {
+		if (packConfig == null)
+			packConfig = new PackConfig(local);
+		return packConfig;
+	}
+
+	/**
+	 * Set the configuration used by the pack generator.
+	 *
+	 * @param pc
+	 *            configuration controlling packing parameters. If null the
+	 *            source repository's settings will be used.
+	 */
+	public void setPackConfig(PackConfig pc) {
+		packConfig = pc;
 	}
 
 	/**

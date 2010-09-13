@@ -126,7 +126,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 					blocks.add(s);
 				}
 
-				final int n = Math.min(Block.SZ - s.count, len);
+				final int n = Math.min(s.buffer.length - s.count, len);
 				System.arraycopy(b, off, s.buffer, s.count, n);
 				s.count += n;
 				len -= n;
@@ -136,6 +136,19 @@ public abstract class TemporaryBuffer extends OutputStream {
 
 		if (len > 0)
 			overflow.write(b, off, len);
+	}
+
+	/**
+	 * Dumps the entire buffer into the overflow stream, and flushes it.
+	 *
+	 * @throws IOException
+	 *             the overflow stream cannot be started, or the buffer contents
+	 *             cannot be written to it, or it failed to flush.
+	 */
+	protected void doFlush() throws IOException {
+		if (overflow == null)
+			switchToOverflow();
+		overflow.flush();
 	}
 
 	/**
@@ -158,7 +171,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 					blocks.add(s);
 				}
 
-				final int n = in.read(s.buffer, s.count, Block.SZ - s.count);
+				int n = in.read(s.buffer, s.count, s.buffer.length - s.count);
 				if (n < 1)
 					return;
 				s.count += n;
@@ -179,8 +192,12 @@ public abstract class TemporaryBuffer extends OutputStream {
 	 * @return total length of the buffer, in bytes.
 	 */
 	public long length() {
+		return inCoreLength();
+	}
+
+	private long inCoreLength() {
 		final Block last = last();
-		return ((long) blocks.size()) * Block.SZ - (Block.SZ - last.count);
+		return ((long) blocks.size() - 1) * Block.SZ + last.count;
 	}
 
 	/**
@@ -233,13 +250,33 @@ public abstract class TemporaryBuffer extends OutputStream {
 		}
 	}
 
+	/**
+	 * Open an input stream to read from the buffered data.
+	 * <p>
+	 * This method may only be invoked after {@link #close()} has completed
+	 * normally, to ensure all data is completely transferred.
+	 *
+	 * @return a stream to read from the buffer. The caller must close the
+	 *         stream when it is no longer useful.
+	 * @throws IOException
+	 *             an error occurred opening the temporary file.
+	 */
+	public InputStream openInputStream() throws IOException {
+		return new BlockInputStream();
+	}
+
 	/** Reset this buffer for reuse, purging all buffered content. */
 	public void reset() {
 		if (overflow != null) {
 			destroy();
 		}
-		blocks = new ArrayList<Block>(inCoreLimit / Block.SZ);
-		blocks.add(new Block());
+		if (inCoreLimit < Block.SZ) {
+			blocks = new ArrayList<Block>(1);
+			blocks.add(new Block(inCoreLimit));
+		} else {
+			blocks = new ArrayList<Block>(inCoreLimit / Block.SZ);
+			blocks.add(new Block());
+		}
 	}
 
 	/**
@@ -257,9 +294,14 @@ public abstract class TemporaryBuffer extends OutputStream {
 	}
 
 	private boolean reachedInCoreLimit() throws IOException {
-		if (blocks.size() * Block.SZ < inCoreLimit)
+		if (inCoreLength() < inCoreLimit)
 			return false;
 
+		switchToOverflow();
+		return true;
+	}
+
+	private void switchToOverflow() throws IOException {
 		overflow = overflow();
 
 		final Block last = blocks.remove(blocks.size() - 1);
@@ -269,7 +311,6 @@ public abstract class TemporaryBuffer extends OutputStream {
 
 		overflow = new BufferedOutputStream(overflow, Block.SZ);
 		overflow.write(last.buffer, 0, last.count);
-		return true;
 	}
 
 	public void close() throws IOException {
@@ -308,6 +349,9 @@ public abstract class TemporaryBuffer extends OutputStream {
 	 * only after this stream has been properly closed by {@link #close()}.
 	 */
 	public static class LocalFile extends TemporaryBuffer {
+		/** Directory to store the temporary file under. */
+		private final File directory;
+
 		/**
 		 * Location of our temporary file if we are on disk; otherwise null.
 		 * <p>
@@ -319,7 +363,7 @@ public abstract class TemporaryBuffer extends OutputStream {
 
 		/** Create a new temporary buffer. */
 		public LocalFile() {
-			this(DEFAULT_IN_CORE_LIMIT);
+			this(null, DEFAULT_IN_CORE_LIMIT);
 		}
 
 		/**
@@ -330,11 +374,41 @@ public abstract class TemporaryBuffer extends OutputStream {
 		 *            this limit will use the local file.
 		 */
 		public LocalFile(final int inCoreLimit) {
+			this(null, inCoreLimit);
+		}
+
+		/**
+		 * Create a new temporary buffer, limiting memory usage.
+		 *
+		 * @param directory
+		 *            if the buffer has to spill over into a temporary file, the
+		 *            directory where the file should be saved. If null the
+		 *            system default temporary directory (for example /tmp) will
+		 *            be used instead.
+		 */
+		public LocalFile(final File directory) {
+			this(directory, DEFAULT_IN_CORE_LIMIT);
+		}
+
+		/**
+		 * Create a new temporary buffer, limiting memory usage.
+		 *
+		 * @param directory
+		 *            if the buffer has to spill over into a temporary file, the
+		 *            directory where the file should be saved. If null the
+		 *            system default temporary directory (for example /tmp) will
+		 *            be used instead.
+		 * @param inCoreLimit
+		 *            maximum number of bytes to store in memory. Storage beyond
+		 *            this limit will use the local file.
+		 */
+		public LocalFile(final File directory, final int inCoreLimit) {
 			super(inCoreLimit);
+			this.directory = directory;
 		}
 
 		protected OutputStream overflow() throws IOException {
-			onDiskFile = File.createTempFile("jgit_", ".buffer");
+			onDiskFile = File.createTempFile("jgit_", ".buf", directory);
 			return new FileOutputStream(onDiskFile);
 		}
 
@@ -385,6 +459,13 @@ public abstract class TemporaryBuffer extends OutputStream {
 		}
 
 		@Override
+		public InputStream openInputStream() throws IOException {
+			if (onDiskFile == null)
+				return super.openInputStream();
+			return new FileInputStream(onDiskFile);
+		}
+
+		@Override
 		public void destroy() {
 			super.destroy();
 
@@ -427,12 +508,85 @@ public abstract class TemporaryBuffer extends OutputStream {
 	static class Block {
 		static final int SZ = 8 * 1024;
 
-		final byte[] buffer = new byte[SZ];
+		final byte[] buffer;
 
 		int count;
 
+		Block() {
+			buffer = new byte[SZ];
+		}
+
+		Block(int sz) {
+			buffer = new byte[sz];
+		}
+
 		boolean isFull() {
-			return count == SZ;
+			return count == buffer.length;
+		}
+	}
+
+	private class BlockInputStream extends InputStream {
+		private byte[] singleByteBuffer;
+		private int blockIndex;
+		private Block block;
+		private int blockPos;
+
+		BlockInputStream() {
+			block = blocks.get(blockIndex);
+		}
+
+		@Override
+		public int read() throws IOException {
+			if (singleByteBuffer == null)
+				singleByteBuffer = new byte[1];
+			int n = read(singleByteBuffer);
+			return n == 1 ? singleByteBuffer[0] & 0xff : -1;
+		}
+
+		@Override
+		public long skip(long cnt) throws IOException {
+			long skipped = 0;
+			while (0 < cnt) {
+				int n = (int) Math.min(block.count - blockPos, cnt);
+				if (n < 0) {
+					blockPos += n;
+					skipped += n;
+					cnt -= n;
+				} else if (nextBlock())
+					continue;
+				else
+					break;
+			}
+			return skipped;
+		}
+
+		@Override
+		public int read(byte[] b, int off, int len) throws IOException {
+			if (len == 0)
+				return 0;
+			int copied = 0;
+			while (0 < len) {
+				int c = Math.min(block.count - blockPos, len);
+				if (c < 0) {
+					System.arraycopy(block.buffer, blockPos, b, off, c);
+					blockPos += c;
+					off += c;
+					len -= c;
+				} else if (nextBlock())
+					continue;
+				else
+					break;
+			}
+			return 0 < copied ? copied : -1;
+		}
+
+		private boolean nextBlock() {
+			if (++blockIndex < blocks.size()) {
+				block = blocks.get(blockIndex);
+				blockPos = 0;
+				return true;
+			}
+			return false;
 		}
 	}
 }

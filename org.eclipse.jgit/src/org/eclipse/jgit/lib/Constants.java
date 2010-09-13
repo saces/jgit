@@ -316,6 +316,9 @@ public final class Constants {
 	/** A bare repository typically ends with this string */
 	public static final String DOT_GIT_EXT = ".git";
 
+	/** Name of the ignore file */
+	public static final String DOT_GIT_IGNORE = ".gitignore";
+
 	/**
 	 * Create a new digest function for objects.
 	 *
@@ -523,6 +526,10 @@ public final class Constants {
 
 	/** name of the file containing the IDs of the parents of a merge commit */
 	public static final String MERGE_HEAD = "MERGE_HEAD";
+
+	/** objectid for the empty blob */
+	public static final ObjectId EMPTY_BLOB_ID = ObjectId
+			.fromString("e69de29bb2d1d6434b8b29ae775ad8c2e48c5391");
 
 	private Constants() {
 		// Hide the default constructor

@@ -68,12 +68,12 @@ import java.util.Set;
 import org.eclipse.jgit.JGitText;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.PackProtocolException;
+import org.eclipse.jgit.errors.UnpackException;
 import org.eclipse.jgit.lib.Config;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.NullProgressMonitor;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectIdSubclassMap;
-import org.eclipse.jgit.lib.PackLock;
 import org.eclipse.jgit.lib.PersonIdent;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.RefUpdate;
@@ -84,9 +84,10 @@ import org.eclipse.jgit.revwalk.RevBlob;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevFlag;
 import org.eclipse.jgit.revwalk.RevObject;
-import org.eclipse.jgit.revwalk.RevTag;
+import org.eclipse.jgit.revwalk.RevSort;
 import org.eclipse.jgit.revwalk.RevTree;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.storage.file.PackLock;
 import org.eclipse.jgit.transport.ReceiveCommand.Result;
 import org.eclipse.jgit.transport.RefAdvertiser.PacketLineOutRefAdvertiser;
 import org.eclipse.jgit.util.io.InterruptTimer;
@@ -575,6 +576,7 @@ public class ReceivePack {
 
 			service();
 		} finally {
+			walk.release();
 			try {
 				if (pckOut != null)
 					pckOut.flush();
@@ -661,6 +663,9 @@ public class ReceivePack {
 			}
 
 			postReceive.onPostReceive(this, filterCommands(Result.OK));
+
+			if (unpackError != null)
+				throw new UnpackException(unpackError);
 		}
 	}
 
@@ -697,7 +702,7 @@ public class ReceivePack {
 		adv.send(refs);
 		if (head != null && !head.isSymbolic())
 			adv.advertiseHave(head.getObjectId());
-		adv.includeAdditionalHaves();
+		adv.includeAdditionalHaves(db);
 		if (adv.isEmpty())
 			adv.advertiseId(ObjectId.zeroId(), "capabilities^{}");
 		adv.end();
@@ -806,6 +811,13 @@ public class ReceivePack {
 		ip = null;
 
 		final ObjectWalk ow = new ObjectWalk(db);
+		ow.setRetainBody(false);
+		if (checkReferencedIsReachable) {
+			ow.sort(RevSort.TOPO);
+			if (!baseObjects.isEmpty())
+				ow.sort(RevSort.BOUNDARY, true);
+		}
+
 		for (final ReceiveCommand cmd : commands) {
 			if (cmd.getResult() != Result.NOT_ATTEMPTED)
 				continue;
@@ -818,8 +830,7 @@ public class ReceivePack {
 			ow.markUninteresting(o);
 
 			if (checkReferencedIsReachable && !baseObjects.isEmpty()) {
-				while (o instanceof RevTag)
-					o = ((RevTag) o).getObject();
+				o = ow.peel(o);
 				if (o instanceof RevCommit)
 					o = ((RevCommit) o).getTree();
 				if (o instanceof RevTree)
@@ -827,22 +838,19 @@ public class ReceivePack {
 			}
 		}
 
-		if (checkReferencedIsReachable) {
-			for (ObjectId id : baseObjects) {
-				   RevObject b = ow.lookupAny(id, Constants.OBJ_BLOB);
-				   if (!b.has(RevFlag.UNINTERESTING))
-				     throw new MissingObjectException(b, b.getType());
-			}
-		}
-
 		RevCommit c;
 		while ((c = ow.next()) != null) {
-			if (checkReferencedIsReachable && !providedObjects.contains(c))
+			if (checkReferencedIsReachable //
+					&& !c.has(RevFlag.UNINTERESTING) //
+					&& !providedObjects.contains(c))
 				throw new MissingObjectException(c, Constants.TYPE_COMMIT);
 		}
 
 		RevObject o;
 		while ((o = ow.nextObject()) != null) {
+			if (o.has(RevFlag.UNINTERESTING))
+				continue;
+
 			if (checkReferencedIsReachable) {
 				if (providedObjects.contains(o))
 					continue;
@@ -852,6 +860,14 @@ public class ReceivePack {
 
 			if (o instanceof RevBlob && !db.hasObject(o))
 				throw new MissingObjectException(o, Constants.TYPE_BLOB);
+		}
+
+		if (checkReferencedIsReachable) {
+			for (ObjectId id : baseObjects) {
+				o = ow.parseAny(id);
+				if (!o.has(RevFlag.UNINTERESTING))
+					throw new MissingObjectException(o, o.getType());
+			}
 		}
 	}
 
@@ -1049,7 +1065,7 @@ public class ReceivePack {
 	private void sendStatusReport(final boolean forClient, final Reporter out)
 			throws IOException {
 		if (unpackError != null) {
-			out.sendString(MessageFormat.format(JGitText.get().unpackError, unpackError.getMessage()));
+			out.sendString("unpack error " + unpackError.getMessage());
 			if (forClient) {
 				for (final ReceiveCommand cmd : commands) {
 					out.sendString("ng " + cmd.getRefName()

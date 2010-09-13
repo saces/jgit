@@ -59,11 +59,13 @@ import org.eclipse.jgit.dircache.DirCacheIterator;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.WindowCursor;
+import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.pgm.CLIText;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
+import org.eclipse.jgit.treewalk.WorkingTreeOptions;
+import org.eclipse.jgit.util.FS;
 
 /**
  * Custom argument handler {@link AbstractTreeIterator} from string values.
@@ -95,14 +97,14 @@ public class AbstractTreeIteratorHandler extends
 		final String name = params.getParameter(0);
 
 		if (new File(name).isDirectory()) {
-			setter.addValue(new FileTreeIterator(new File(name)));
+			setter.addValue(new FileTreeIterator(new File(name), FS.DETECTED, WorkingTreeOptions.createDefaultInstance()));
 			return 1;
 		}
 
 		if (new File(name).isFile()) {
 			final DirCache dirc;
 			try {
-				dirc = DirCache.read(new File(name));
+				dirc = DirCache.read(new File(name), FS.DETECTED);
 			} catch (IOException e) {
 				throw new CmdLineException(MessageFormat.format(CLIText.get().notAnIndexFile, name), e);
 			}
@@ -120,9 +122,9 @@ public class AbstractTreeIteratorHandler extends
 			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
 
 		final CanonicalTreeParser p = new CanonicalTreeParser();
-		final WindowCursor curs = new WindowCursor();
+		final ObjectReader curs = clp.getRepository().newObjectReader();
 		try {
-			p.reset(clp.getRepository(), clp.getRevWalk().parseTree(id), curs);
+			p.reset(curs, clp.getRevWalk().parseTree(id));
 		} catch (MissingObjectException e) {
 			throw new CmdLineException(MessageFormat.format(CLIText.get().notATree, name));
 		} catch (IncorrectObjectTypeException e) {

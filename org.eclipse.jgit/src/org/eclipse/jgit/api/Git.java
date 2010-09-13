@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2010, Christian Halstrick <christian.halstrick@sap.com>
+ * Copyright (C) 2010, Chris Aniszczyk <caniszczyk@gmail.com>
  * and other copyright owners as documented in the project's IP log.
  *
  * This program and the accompanying materials are made available
@@ -79,7 +80,7 @@ public class Git {
 	private final Repository repo;
 
 	/**
-	 * Constructs a new {@link Git} class which can interact with the specified
+	 * Constructs a new {@link Git} object which can interact with the specified
 	 * git repository. All command classes returned by methods of this class
 	 * will always interact with this git repository.
 	 *
@@ -94,7 +95,7 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command class to execute a {@code Commit} command
+	 * Returns a command object to execute a {@code Commit} command
 	 *
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-commit.html"
@@ -107,7 +108,7 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command class to execute a {@code Log} command
+	 * Returns a command object to execute a {@code Log} command
 	 *
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-log.html"
@@ -120,7 +121,7 @@ public class Git {
 	}
 
 	/**
-	 * Returns a command class to execute a {@code Merge} command
+	 * Returns a command object to execute a {@code Merge} command
 	 *
 	 * @see <a
 	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-merge.html"
@@ -133,9 +134,36 @@ public class Git {
 	}
 
 	/**
+	 * Returns a command object to execute a {@code Add} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-add.html"
+	 *      >Git documentation about Add</a>
+	 * @return a {@link AddCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code Add} command
+	 */
+	public AddCommand add() {
+		return new AddCommand(repo);
+	}
+
+	/**
+	 * Returns a command object to execute a {@code Tag} command
+	 *
+	 * @see <a
+	 *      href="http://www.kernel.org/pub/software/scm/git/docs/git-tag.html"
+	 *      >Git documentation about Tag</a>
+	 * @return a {@link TagCommand} used to collect all optional parameters
+	 *         and to finally execute the {@code Tag} command
+	 */
+	public TagCommand tag() {
+		return new TagCommand(repo);
+	}
+
+	/**
 	 * @return the git repository this class is interacting with
 	 */
 	public Repository getRepository() {
 		return repo;
 	}
+
 }

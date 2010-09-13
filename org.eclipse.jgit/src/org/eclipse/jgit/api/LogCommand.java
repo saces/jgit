@@ -46,6 +46,8 @@ import java.io.IOException;
 import java.text.MessageFormat;
 
 import org.eclipse.jgit.JGitText;
+import org.eclipse.jgit.api.errors.JGitInternalException;
+import org.eclipse.jgit.api.errors.NoHeadException;
 import org.eclipse.jgit.errors.IncorrectObjectTypeException;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.AnyObjectId;
@@ -64,7 +66,7 @@ import org.eclipse.jgit.revwalk.RevWalk;
  * This is currently a very basic implementation which takes only one starting
  * revision as option.
  *
- * @TODO add more options (revision ranges, sorting, ...)
+ * TODO: add more options (revision ranges, sorting, ...)
  *
  * @see <a href="http://www.kernel.org/pub/software/scm/git/docs/git-log.html"
  *      >Git documentation about Log</a>
