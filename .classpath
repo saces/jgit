@@ -3,6 +3,6 @@
 	<classpathentry kind="src" path="org.eclipse.jgit/src"/>
 	<classpathentry kind="src" path="org.eclipse.jgit.http.server/src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/J2SE-1.5"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/orbit"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/servlet-api-2.5"/>
 	<classpathentry kind="output" path="build"/>
 </classpath>
