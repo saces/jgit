@@ -83,7 +83,7 @@
 				<attribute name="Export-Package" value="org.eclipse.jgit, org.eclipse.jgit.api, org.eclipse.jgit.diff,
 				org.eclipse.jgit.dircache, org.eclipse.jgit.errors, org.eclipse.jgit.fnmatch, org.eclipse.jgit.lib,
 				org.eclipse.jgit.merge, org.eclipse.jgit.nls, org.eclipse.jgit.patch, org.eclipse.jgit.revplot,
-				org.eclipse.jgit.revwalk, org.eclipse.jgit.revwalk.filter, org.eclipse.jgit.transport,
+				org.eclipse.jgit.revwalk, org.eclipse.jgit.revwalk.filter, org.eclipse.jgit.storage.file, org.eclipse.jgit.transport,
 				org.eclipse.jgit.treewalk, org.eclipse.jgit.treewalk.filter, org.eclipse.jgit.util, org.eclipse.jgit.util.io,
 				org.eclipse.jgit.http.server, org.eclipse.jgit.http.server.glue, org.eclipse.jgit.http.server.resolver" />
 				<attribute name="Import-Package" value="javax.servlet, javax.servlet.http"/>
