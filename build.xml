@@ -9,7 +9,7 @@
 	<property name="src.jgit.jgit" location="org.eclipse.jgit/src/"/>
 	<property name="src.jgit.http.server" location="org.eclipse.jgit.http.server/src/"/>
 
-	<property name="servletapi.jar.location" location="../concierge/bundles/http/dist/concierge-http.jar"/>
+	<property name="servletapi.jar.location" location="../servlet-api-2.5/dist/servlet-api-2.5.jar"/>
 
 	<target name="mkdir">
 		<mkdir dir="${build}"/>
